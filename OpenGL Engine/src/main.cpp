@@ -25,17 +25,17 @@ static bool glLogCall(const char* function, const char* file, unsigned int line)
     return true;
 }
 
-struct Shader
+struct ShaderSource
 {
     std::string vertex;
     std::string fragment;
 };
 
-static Shader parseShaders(const std::string filePath)
+static ShaderSource parseShaders(const std::string filePath)
 {
     std::ifstream stream(filePath);
     std::string line;
-    Shader contents;
+    ShaderSource contents;
     std::string currentShader;
     while (std::getline(stream, line)) {
         if (line.find("#shader") != std::string::npos) {
@@ -105,6 +105,11 @@ int main(void)
     if (!glfwInit())
         return -1;
 
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+
     /* Create a windowed mode window and its OpenGL context */
     window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
     if (!window)
@@ -115,6 +120,8 @@ int main(void)
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
+
+    glfwSwapInterval(1);
 
     if (glewInit() != GLEW_OK)
         std::cout << "Error! GLEW could not be initialised.\n";
@@ -133,10 +140,14 @@ int main(void)
         2, 3, 0
     };
 
+    unsigned int vao;
+    glCall(glGenVertexArrays(1, &vao));
+    glCall(glBindVertexArray(vao));
+
     unsigned int buffer;
     glCall(glGenBuffers(1, &buffer));
     glCall(glBindBuffer(GL_ARRAY_BUFFER, buffer));
-    glCall(glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), positions, GL_STATIC_DRAW));
+    glCall(glBufferData(GL_ARRAY_BUFFER, 4 * 2 * sizeof(float), positions, GL_STATIC_DRAW));
 
     glCall(glEnableVertexAttribArray(0));
     glCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (const void*)0));
@@ -146,10 +157,21 @@ int main(void)
     glCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
     glCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW));
 
-    Shader parsedShaders = parseShaders("basic.shader");
-
-    unsigned int shader = createShader(parsedShaders.vertex, parsedShaders.fragment);
+    ShaderSource source = parseShaders("basic.shader");
+    unsigned int shader = createShader(source.vertex, source.fragment);
     glCall(glUseProgram(shader));
+
+    glCall(int location = glGetUniformLocation(shader, "u_Color"));
+    ASSERT(location != -1);
+    glCall(glUniform4f(location, 0.2f, 0.3f, 0.8f, 1.0f));
+
+    glCall(glBindVertexArray(0));
+    glCall(glUseProgram(0));
+    glCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    glCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+    float r = 0.0;
+    float increment = 0.05f;
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
@@ -157,7 +179,17 @@ int main(void)
         /* Render here */
         glCall(glClear(GL_COLOR_BUFFER_BIT));
         
+        glCall(glUseProgram(shader));
+        glCall(glUniform4f(location, r, 0.3f, 0.8f, 1.0f));
+
+        glCall(glBindVertexArray(vao));
+        glCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
+
         glCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
+
+        if (r > 1.0f || r < 0.0f)
+            increment = -increment;
+        r += increment;
 
         /* Swap front and back buffers */
         glCall(glfwSwapBuffers(window));
