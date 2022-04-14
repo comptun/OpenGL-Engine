@@ -2,26 +2,78 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <fstream>
+#include <string>
+
+#define ASSERT(x) if (!(x)) __debugbreak();
+#define glCall(x) glClearErrors(); \
+                  x; \
+                  ASSERT(glLogCall(#x, __FILE__, __LINE__))
+
+static void glClearErrors()
+{
+    while (glGetError() != GL_NO_ERROR);
+}
+
+static bool glLogCall(const char* function, const char* file, unsigned int line)
+{
+    while (GLenum error = glGetError()) {
+        std::cout << "[OpenGL Error] (0x0" << std::hex << error << std::dec << "): "
+                  << function << " " << file << ":" << line << "\n";
+        return false;
+    }
+    return true;
+}
+
+struct Shader
+{
+    std::string vertex;
+    std::string fragment;
+};
+
+static Shader parseShaders(const std::string filePath)
+{
+    std::ifstream stream(filePath);
+    std::string line;
+    Shader contents;
+    std::string currentShader;
+    while (std::getline(stream, line)) {
+        if (line.find("#shader") != std::string::npos) {
+            if (line.find("vertex") != std::string::npos) {
+                currentShader = "vertex";
+            }
+            else if (line.find("fragment") != std::string::npos) {
+                currentShader = "fragment";
+            }
+            continue;
+        }
+        if (currentShader == "vertex")
+            contents.vertex += line + "\n";
+        else if (currentShader == "fragment")
+            contents.fragment += line + "\n";
+    }
+    return contents;
+}
 
 static unsigned int compileShader(unsigned int type, const std::string& source)
 {
-    unsigned int id = glCreateShader(type);
+    glCall(unsigned int id = glCreateShader(type));
     const char* src = source.c_str();
-    glShaderSource(id, 1, &src, nullptr);
-    glCompileShader(id);
+    glCall(glShaderSource(id, 1, &src, nullptr));
+    glCall(glCompileShader(id));
 
     int result;
-    glGetShaderiv(id, GL_COMPILE_STATUS, &result);
+    glCall(glGetShaderiv(id, GL_COMPILE_STATUS, &result));
     if (result == GL_FALSE) {
         int length;
-        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+        glCall(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length));
         char* message = (char*)alloca(length * sizeof(char));
-        glGetShaderInfoLog(id, length, &length, message);
+        glCall(glGetShaderInfoLog(id, length, &length, message));
         std::cout << "Failed to compile " 
             << (type == GL_VERTEX_SHADER ? "vertex" : "fragment") 
             << " shader!\n";
         std::cout << message << "\n";
-        glDeleteShader(id);
+        glCall(glDeleteShader(id));
         return 0;
     }
 
@@ -30,17 +82,17 @@ static unsigned int compileShader(unsigned int type, const std::string& source)
 
 static unsigned int createShader(const std::string& vertexShader, const std::string& fragmentShader)
 {
-    unsigned int program = glCreateProgram();
+    glCall(unsigned int program = glCreateProgram());
     unsigned int vs = compileShader(GL_VERTEX_SHADER, vertexShader);
     unsigned int fs = compileShader(GL_FRAGMENT_SHADER, fragmentShader);
 
-    glAttachShader(program, vs);
-    glAttachShader(program, fs);
-    glLinkProgram(program);
-    glValidateProgram(program);
+    glCall(glAttachShader(program, vs));
+    glCall(glAttachShader(program, fs));
+    glCall(glLinkProgram(program));
+    glCall(glValidateProgram(program));
 
-    glDeleteShader(vs);
-    glDeleteShader(fs);
+    glCall(glDeleteShader(vs));
+    glCall(glDeleteShader(fs));
 
     return program;
 }
@@ -57,7 +109,7 @@ int main(void)
     window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
     if (!window)
     {
-        glfwTerminate();
+        glCall(glfwTerminate());
         return -1;
     }
 
@@ -69,57 +121,52 @@ int main(void)
 
     std::cout << glGetString(GL_VERSION) << "\n";
 
-    float positions[6] = {
+    float positions[] = {
        -0.5f, -0.5f,
-        0.0f,  0.5f,
-        0.5f, -0.5f
+        0.5f, -0.5f,
+        0.5f,  0.5f,
+       -0.5f,  0.5f,
+    };
+
+    unsigned int indices[] = {
+        0, 1, 2,
+        2, 3, 0
     };
 
     unsigned int buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW);
+    glCall(glGenBuffers(1, &buffer));
+    glCall(glBindBuffer(GL_ARRAY_BUFFER, buffer));
+    glCall(glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), positions, GL_STATIC_DRAW));
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (const void*)0);
+    glCall(glEnableVertexAttribArray(0));
+    glCall(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (const void*)0));
 
-    std::string vertexShader =
-        "#version 330 core\n"
-        "\n"
-        "layout(location = 0) in vec4 position;\n"
-        "void main()\n"
-        "{\n"
-        "   gl_Position = position;\n"
-        "}\n";
+    unsigned int ibo;
+    glCall(glGenBuffers(1, &ibo));
+    glCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
+    glCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW));
 
-    std::string fragmentShader =
-        "#version 330 core\n"
-        "\n"
-        "layout(location = 0) out vec4 color;\n"
-        "void main()\n"
-        "{\n"
-        "   color = vec4(1.0, 0.0, 0.0, 1.0);\n"
-        "}\n";
+    Shader parsedShaders = parseShaders("basic.shader");
 
-    unsigned int shader = createShader(vertexShader, fragmentShader);
-    glUseProgram(shader);
+    unsigned int shader = createShader(parsedShaders.vertex, parsedShaders.fragment);
+    glCall(glUseProgram(shader));
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
-        glClear(GL_COLOR_BUFFER_BIT);
+        glCall(glClear(GL_COLOR_BUFFER_BIT));
         
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
 
         /* Swap front and back buffers */
-        glfwSwapBuffers(window);
+        glCall(glfwSwapBuffers(window));
 
         /* Poll for and process events */
-        glfwPollEvents();
+        glCall(glfwPollEvents());
     }
 
-    glDeleteProgram(shader);
+    glCall(glDeleteProgram(shader));
 
     glfwTerminate();
     return 0;
