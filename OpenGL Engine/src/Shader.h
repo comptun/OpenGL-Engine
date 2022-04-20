@@ -1,5 +1,4 @@
-#ifndef SHADER_H
-#define SHADER_H
+#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -23,14 +22,14 @@ public:
 	void bind() const;
 	void unbind() const;
 
-	// set uniform
+	// set uniforms
+	void setUniform1i(const std::string& name, int v0);
+	void setUniform1f(const std::string& name, float v0);
 	void setUniform4f(const std::string& name, float v0, float v1, float v2, float v3);
 private:
 	ShaderSource parseShaders(const std::string filePath);
 	unsigned int compileShader(unsigned int type, const std::string& source);
 	unsigned int createShader(const std::string& vertexShader, const std::string& fragmentShader);
 
-	unsigned int getUniformLocation(const std::string& name);
+	int getUniformLocation(const std::string& name);
 };
-
-#endif

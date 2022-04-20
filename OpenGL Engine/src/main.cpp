@@ -8,10 +8,11 @@
 #include "Renderer.h"
 
 #include "VertexBuffer.h"
+#include "VertexBufferLayout.h"
 #include "IndexBuffer.h"
 #include "VertexArray.h"
 #include "Shader.h"
-
+#include "Texture.h"
 
 
 int main(void)
@@ -47,10 +48,10 @@ int main(void)
 
     {
         float positions[] = {
-           -0.5f, -0.5f,
-            0.5f, -0.5f,
-            0.5f,  0.5f,
-           -0.5f,  0.5f,
+           -0.5f, -0.5f, 0.0f, 0.0f,
+            0.5f, -0.5f, 1.0f, 0.0f,
+            0.5f,  0.5f, 1.0f, 1.0f,
+           -0.5f,  0.5f, 0.0f, 1.0f,
         };
 
         unsigned int indices[] = {
@@ -59,21 +60,29 @@ int main(void)
         };
 
         VertexArray va;
-        VertexBuffer vb(positions, 4 * 2 * sizeof(float));
+        VertexBuffer vb(positions, 4 * 4 * sizeof(float));
         VertexBufferLayout layout;
+        layout.push<float>(2);
         layout.push<float>(2);
         va.addBuffer(vb, layout);
 
         IndexBuffer ib(indices, 6);
 
-        Shader shader("basic.shader");
+        Shader shader("res/shaders/basic.shader");
         shader.bind();
         shader.setUniform4f("u_Color", 0.2f, 0.3f, 0.8f, 1.0f);
+
+        Texture texture("res/textures/taco.png");
+        texture.bind();
+        shader.bind();
+        shader.setUniform1i("u_Texture", 0);
         
         va.unbind();
         shader.unbind();
         vb.unbind();
         ib.unbind();
+
+        Renderer renderer;
 
         float r = 0.0;
         float increment = 0.05f;
@@ -82,15 +91,12 @@ int main(void)
         while (!glfwWindowShouldClose(window))
         {
             /* Render here */
-            glCall(glClear(GL_COLOR_BUFFER_BIT));
+            renderer.clear();
 
             shader.bind();
             shader.setUniform4f("u_Color", r, 0.3f, 0.8f, 1.0f);
 
-            va.bind();
-            ib.bind();
-
-            glCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
+            renderer.draw(va, ib, shader);
 
             if (r > 1.0f || r < 0.0f)
                 increment = -increment;

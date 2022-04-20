@@ -1,8 +1,8 @@
-#ifndef VERTEX_ARRAY_H
-#define VERTEX_ARRAY_H
+#pragma once
 
 #include "VertexBuffer.h"
-#include "VertexBufferLayout.h"
+
+class VertexBufferLayout;
 
 class VertexArray
 {
@@ -17,5 +17,3 @@ public:
 	void bind() const;
 	void unbind() const;
 };
-
-#endif
