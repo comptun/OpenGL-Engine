@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include <string>
 
 #include "Renderer.h"
@@ -32,9 +33,10 @@ int main(void)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
+    constexpr int WIDTH = 1440, HEIGHT = 720;
 
     /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(960, 960, "Hello World", NULL, NULL);
+    window = glfwCreateWindow(WIDTH, HEIGHT, "Hello World", NULL, NULL);
     if (!window)
     {
         glCall(glfwTerminate());
@@ -53,22 +55,31 @@ int main(void)
 
     {
         float positions[] = {
-           -0.5f, 0.0f,  0.5f,    0.0f, 0.0f,
-           -0.5f, 0.0f, -0.5f,    1.0f, 0.0f,
-            0.5f, 0.0f, -0.5f,    0.0f, 0.0f,
-            0.5f, 0.0f,  0.5f,    1.0f, 0.0f,
-            0.0f, 0.8f,  0.0f,    0.5f, 1.0f,
+            -0.5, -0.5, -0.5,
+            -0.5, -0.5,  0.5,
+             0.5, -0.5,  0.5,
+             0.5, -0.5, -0.5,
+            -0.5,  0.5, -0.5,
+            -0.5,  0.5,  0.5,
+             0.5,  0.5,  0.5,
+             0.5,  0.5, -0.5,
         };
 
         unsigned int indices[] = {
-            0, 1, 2,
-            0, 2, 3,
-            0, 1, 4,
-            1, 2, 4,
-            2, 3, 4,
+            0, 1, 5,
+            0, 4, 5,
+            1, 2, 6,
+            1, 5, 6,
+            2, 3, 7,
+            2, 6, 7,
+            3, 7, 4,
             3, 0, 4,
+            4, 5, 6,
+            4, 7, 6,
+            0, 1, 2,
+            0, 3, 2,
         };
-     
+
         glCall(glEnable(GL_DEPTH_TEST));
         glCall(glEnable(GL_BLEND));
         glCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -78,15 +89,21 @@ int main(void)
         VertexBufferLayout layout;
 
         layout.push<float>(3);
-        layout.push<float>(2);
         va.addBuffer(vb, layout);
 
         IndexBuffer ib(indices, sizeof(indices) / sizeof(unsigned int));
 
         Shader shader("res/shaders/basic.shader");
-        Texture texture("res/textures/brick.png");
+        Texture texture(std::vector<std::string>{
+            "res/textures/skybox/right.jpg",
+            "res/textures/skybox/left.jpg",
+            "res/textures/skybox/top.jpg",
+            "res/textures/skybox/bottom.jpg",
+            "res/textures/skybox/front.jpg",
+            "res/textures/skybox/back.jpg"
+        });
 
-        texture.bind();
+        texture.bind(0);
         shader.bind();
         shader.setUniform1i("u_Texture", 0);
         
@@ -102,17 +119,17 @@ int main(void)
         ImGui_ImplGlfwGL3_Init(window, true);
         ImGui::StyleColorsDark();
 
-        glm::vec3 translationA(0.f, 0.f, -5.0f);
-        
-        float rot = 0.1f;
-        float increment = 0.1f;
+        glm::vec3 blockPos(0.0f, 0.0f, -10.0f);
+        glm::vec3 blockPos2(1.0f, 0.0f, -10.0f);
 
-        constexpr int WIDTH = 960, HEIGHT = 540;
+        glm::vec3 cameraPos(0.0f, 0.0f, 0.0f);
+        
+        float increment = 0.1f;
 
         /* Loop until the user closes the window */
         while (!glfwWindowShouldClose(window))
         {
-            glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 0));
+            glm::mat4 view = glm::translate(glm::mat4(1.0f), cameraPos);
             glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)(WIDTH / HEIGHT), 0.1f, 1000.0f);
 
 
@@ -121,10 +138,35 @@ int main(void)
 
             ImGui_ImplGlfwGL3_NewFrame();
 
-            shader.bind();
+            glCall(glDisable(GL_DEPTH_TEST));
 
             {
-                glm::mat4 model = glm::translate(glm::mat4(1.0f), translationA);
+                static float rot = 0.0f;
+                shader.bind();
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.f, 0.f, 0.f));
+                model = glm::rotate(model, glm::radians<float>(rot), glm::vec3(0.0f, 1.0f, 0.0f));
+                glm::mat4 mvp = proj * model;
+                rot = rot + 0.01;
+                shader.setUniformMat4f("u_MVP", mvp);
+                renderer.draw(va, ib, shader);
+            }
+
+            glCall(glEnable(GL_DEPTH_TEST));
+
+            {
+                static float rot = 0.0f;
+                shader.bind();
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPos);
+                model = glm::rotate(model, glm::radians<float>(rot), glm::vec3(0.0f, 1.0f, 0.0f));
+                glm::mat4 mvp = proj * view * model;
+                rot = rot + increment;
+                shader.setUniformMat4f("u_MVP", mvp);
+                renderer.draw(va, ib, shader);
+            }
+            {
+                static float rot = 0.0f;
+                shader.bind();
+                glm::mat4 model = glm::translate(glm::mat4(1.0f), blockPos2);
                 model = glm::rotate(model, glm::radians<float>(rot), glm::vec3(0.0f, 1.0f, 0.0f));
                 glm::mat4 mvp = proj * view * model;
                 rot = rot + increment;
@@ -132,11 +174,10 @@ int main(void)
                 renderer.draw(va, ib, shader);
             }
 
-
             {
                 ImGui::Begin("Debugger");
                 ImGui::Text("Hello, world!");
-                ImGui::SliderFloat3("TranslationA", &translationA.x, -10.0f, 10.0);
+                ImGui::SliderFloat3("TranslationA", &cameraPos.x, -10.0f, 10.0);
 
                  ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
                 ImGui::End();
