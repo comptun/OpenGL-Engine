@@ -94,6 +94,10 @@ void Shader::unbind() const
 }
 
 // set uniforms
+void Shader::setUniformMat4f(const std::string& name, const glm::mat4& mat)
+{
+    glCall(glUniformMatrix4fv(getUniformLocation(name), 1, GL_FALSE, &mat[0][0]));
+}
 void Shader::setUniform1i(const std::string& name, int v0)
 {
     glCall(glUniform1i(getUniformLocation(name), v0));

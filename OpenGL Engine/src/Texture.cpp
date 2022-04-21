@@ -9,7 +9,7 @@ Texture::Texture(const std::string path)
 	m_LocalBuffer = stbi_load(path.c_str(), &m_Width, &m_Height, &m_BPP, 4);
 
 	glCall(glGenTextures(1, &m_RendererID));
-	glCall(glBindTexture(GL_TEXTURE_2D, m_RendererID));
+	glCall(glBindTexture(GL_TEXTURE_2D, m_RendererID)); 
 
 	glCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
 	glCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
